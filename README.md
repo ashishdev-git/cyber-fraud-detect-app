@@ -5,7 +5,8 @@ Local fraud-assessment demo using Gemini, FastAPI, LangGraph, and Streamlit.
 ## Run
 
 Set GOOGLE_API_KEY in .env. Keep that file private. No other API key is needed.
-From this folder, run in separate terminals:
+Streamlit calls shared Python functions directly; a FastAPI server is optional.
+To use the optional REST API, run:
 
 ```sh
 .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -33,7 +34,20 @@ This is a local demo. Results depend on available evidence and may be wrong.
 
 Optional GEMINI_MODEL selects a different model available to your Gemini account.
 Optional CYBERSHIELD_DB changes the local database path.
-Optional CYBERSHIELD_API_URL changes the frontend's backend address.
+The frontend does not require CYBERSHIELD_API_URL or a running backend.
+
+## Streamlit Community Cloud
+
+Deploy client.py from the repository. In App settings > Secrets, configure:
+
+```toml
+GOOGLE_API_KEY = "your_actual_key"
+```
+
+Keep the key out of GitHub. Root-level Streamlit secrets are exposed as environment variables.
+Push all code changes, including app/service.py, to the branch used by Streamlit.
+Reboot the cloud app after updating secrets if needed.
+Local SQLite feedback is temporary on cloud hosting and may be lost on rebuild.
 
 Install dependencies with `.venv/bin/python -m pip install -r requirements.txt`.
 Run offline checks with `.venv/bin/python -B -m unittest discover -s tests -v`.

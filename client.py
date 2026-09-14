@@ -1,10 +1,8 @@
 import base64
-import os
 
-import requests
 import streamlit as st
 
-API = os.getenv('CYBERSHIELD_API_URL', 'http://127.0.0.1:8000').rstrip('/')
+from app.service import FraudRequest, FeedbackRequest, AnalysisUnavailable, analyze_fraud, feedback
 st.set_page_config(page_title='CyberShield', page_icon='🛡️', layout='centered')
 st.title('🛡️ CyberShield')
 st.caption('Understand suspicious messages, screenshots, and links.')
@@ -45,19 +43,6 @@ if image_bytes and len(image_bytes) <= 5 * 1024 * 1024:
         st.warning('Cannot preview this image. Upload a valid PNG, JPEG, or WebP.')
 
 
-def post(path, payload):
-    response = requests.post(API + path, json=payload, timeout=(5, 120))
-    if not response.ok:
-        try:
-            detail = response.json().get('detail')
-        except ValueError:
-            detail = None
-        if not isinstance(detail, str):
-            detail = 'Request failed. Check the input and try again.'
-        raise ValueError(detail)
-    return response.json()
-
-
 if st.button('Analyse', type='primary', use_container_width=True):
     st.session_state.pop('result', None)
     st.session_state.pop('feedback_saved', None)
@@ -71,10 +56,10 @@ if st.button('Analyse', type='primary', use_container_width=True):
             payload['image_base64'] = base64.b64encode(image_bytes).decode()
         try:
             with st.spinner('Reviewing your message and screenshot…'):
-                st.session_state.result = post('/analyze', payload)
+                st.session_state.result = analyze_fraud(FraudRequest(**payload))
             st.session_state.result_language = language
-        except requests.exceptions.RequestException:
-            st.error('Could not reach the analysis service. Make sure the backend is running, then retry.')
+        except AnalysisUnavailable as error:
+            st.error(str(error))
         except ValueError as error:
             st.error(str(error))
 
@@ -130,9 +115,9 @@ if result:
         vote = 'not_helpful'
     if vote:
         try:
-            post('/feedback', {'analysis_id': result['analysis_id'], 'rating': vote})
+            feedback(FeedbackRequest(analysis_id=result['analysis_id'], rating=vote))
             st.session_state.feedback_saved = vote
-        except (requests.exceptions.RequestException, ValueError):
+        except (LookupError, ValueError, OSError):
             st.error('Feedback could not be saved. Please try again.')
     if st.session_state.get('feedback_saved'):
         st.success('Thanks — your feedback has been saved.')

@@ -65,13 +65,13 @@ class Features(unittest.TestCase):
             self.assertEqual(self.client.post('/analyze', json=payload).status_code, 422)
 
     def test_model_failure(self):
-        with patch('app.main.fraud_agent.invoke', side_effect=RuntimeError('secret details')):
+        with patch('app.service.fraud_agent.invoke', side_effect=RuntimeError('secret details')):
             response = self.client.post('/analyze', json={'message': 'test'})
             self.assertEqual(response.status_code, 502)
             self.assertNotIn('secret details', response.text)
 
     def test_feedback_updates_and_unknown_id(self):
-        with patch('app.main.fraud_agent.invoke', return_value={'analysis': ASSESSMENT}):
+        with patch('app.service.fraud_agent.invoke', return_value={'analysis': ASSESSMENT}):
             result = self.client.post('/analyze', json={'message': 'test'}).json()
         for rating in ['helpful', 'not_helpful']:
             self.assertEqual(self.client.post('/feedback', json={'analysis_id': result['analysis_id'], 'rating': rating}).status_code, 200)
@@ -97,17 +97,16 @@ class Features(unittest.TestCase):
         self.assertFalse(ui.exception)
         next(b for b in ui.button if b.label == 'Hindi scam').click().run()
         self.assertIn('बधाई', ui.text_area[0].value)
-        with patch('requests.post') as post:
-            post.return_value.ok = True
-            post.return_value.json.return_value = {'analysis_id': str(uuid4()), 'analysis': ASSESSMENT, 'url_checks': []}
+        with patch('app.agent.model') as model, patch('requests.post', side_effect=AssertionError('Frontend must not call HTTP')):
+            model.return_value.invoke.return_value = FraudAnalysis(**ASSESSMENT)
             next(b for b in ui.button if b.label == 'Analyse').click().run()
             self.assertFalse(ui.exception)
             self.assertIn('result', ui.session_state)
-            post.return_value.json.return_value = {'success': True}
             next(b for b in ui.button if b.label == '👍 Helpful').click().run()
             self.assertFalse(ui.exception)
             self.assertEqual(ui.session_state['feedback_saved'], 'helpful')
             self.assertIn('result', ui.session_state)
+
 
 
 if __name__ == '__main__':
